@@ -23,6 +23,8 @@ cd plant-disease-prediction
 
 2. Coloca el archivo `model.keras` en la carpeta `output/`
 
+# descarga de carpeta data (esta carpeta va en la raiz del proyeco)
+https://drive.google.com/drive/folders/1tabjM32iX-SEc3Ofpc_AJIjW7RSdTfhX?usp=sharing
 
 # 3. Instalar dependencias de Python
 
