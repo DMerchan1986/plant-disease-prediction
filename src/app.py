@@ -2,16 +2,19 @@ import gradio as gr
 import tensorflow as tf
 import numpy as np
 from PIL import Image
+import plotly.graph_objects as go
+import plotly.express as px
+from plotly.subplots import make_subplots
 import base64
-import os
+import io
 
-# Cargar el modelo
-model = tf.keras.models.load_model('model.keras')
+# Cargar el modelo (ruta corregida)
+model = tf.keras.models.load_model('output/model.keras')
 
-# Clases de enfermedades
+# Lista de clases (ajusta según tu modelo)
 class_names = [
     'Apple___Apple_scab',
-    'Apple___Black_rot',
+    'Apple___Black_rot', 
     'Apple___Cedar_apple_rust',
     'Apple___healthy',
     'Blueberry___healthy',
@@ -50,80 +53,429 @@ class_names = [
     'Tomato___healthy'
 ]
 
+def format_class_name(class_name):
+    """Formatear nombre de clase para mostrar"""
+    formatted = class_name.replace('___', ' - ').replace('_', ' ')
+    return formatted.title()
+
+def get_plant_type(class_name):
+    """Extraer tipo de planta del nombre de clase"""
+    return class_name.split('___')[0].replace('_', ' ').title()
+
+def get_disease_name(class_name):
+    """Extraer nombre de enfermedad del nombre de clase"""
+    parts = class_name.split('___')
+    if len(parts) > 1:
+        disease = parts[1].replace('_', ' ')
+        return disease.title() if disease.lower() != 'healthy' else 'Saludable'
+    return 'Desconocido'
+
+def create_prediction_chart(predictions, class_names, top_n=5):
+    """Crear gráfico de barras con las mejores predicciones"""
+    top_indices = np.argsort(predictions[0])[-top_n:][::-1]
+    top_probs = predictions[0][top_indices]
+    top_classes = [format_class_name(class_names[i]) for i in top_indices]
+    
+    # Colores más contrastantes para tema claro
+    colors = ['#2E7D32' if i == 0 else '#1976D2' for i in range(len(top_classes))]
+    
+    fig = go.Figure(data=[
+        go.Bar(
+            y=top_classes,
+            x=top_probs * 100,
+            orientation='h',
+            marker_color=colors,
+            text=[f'{prob:.1f}%' for prob in top_probs * 100],
+            textposition='auto',
+            textfont=dict(color='white', size=12, family="Arial Black"),
+        )
+    ])
+    
+    fig.update_layout(
+        title={
+            'text': '<b>Distribución de Probabilidades</b>',
+            'x': 0.5,
+            'xanchor': 'center',
+            'font': {'size': 18, 'color': '#1B5E20', 'family': 'Arial Black'}
+        },
+        xaxis_title='<b>Confianza (%)</b>',
+        yaxis_title='<b>Diagnóstico</b>',
+        template='plotly_white',
+        height=400,
+        margin=dict(l=20, r=20, t=60, b=20),
+        plot_bgcolor='white',
+        paper_bgcolor='white',
+        font=dict(color='#2E2E2E', size=11, family='Arial'),
+        xaxis=dict(
+            gridcolor='#E0E0E0',
+            range=[0, 100],
+            title_font=dict(color='#1B5E20', size=14)
+        ),
+        yaxis=dict(
+            gridcolor='#E0E0E0',
+            title_font=dict(color='#1B5E20', size=14)
+        )
+    )
+    
+    return fig
+
+def create_confidence_gauge(confidence):
+    """Crear medidor de confianza"""
+    fig = go.Figure(go.Indicator(
+        mode = "gauge+number",
+        value = confidence,
+        domain = {'x': [0, 1], 'y': [0, 1]},
+        title = {
+            'text': "<b>Nivel de Confianza</b>", 
+            'font': {'color': '#1B5E20', 'size': 16, 'family': 'Arial Black'}
+        },
+        number = {'font': {'color': '#2E7D32', 'size': 24, 'family': 'Arial Black'}},
+        gauge = {
+            'axis': {
+                'range': [None, 100], 
+                'tickcolor': '#2E2E2E',
+                'tickfont': {'color': '#2E2E2E', 'size': 12}
+            },
+            'bar': {'color': "#2E7D32", 'thickness': 0.8},
+            'steps': [
+                {'range': [0, 50], 'color': "#FFCDD2"},
+                {'range': [50, 80], 'color': "#FFF9C4"},
+                {'range': [80, 100], 'color': "#C8E6C9"}
+            ],
+            'threshold': {
+                'line': {'color': "#D32F2F", 'width': 4},
+                'thickness': 0.75,
+                'value': 90
+            }
+        }
+    ))
+    
+    fig.update_layout(
+        template='plotly_white',
+        paper_bgcolor='white',
+        plot_bgcolor='white',
+        font={'color': '#2E2E2E'},
+        height=300,
+        margin=dict(l=20, r=20, t=40, b=20)
+    )
+    
+    return fig
+
 def predict_disease(image):
-    # Preprocesar la imagen
-    img = Image.fromarray(image.astype('uint8'), 'RGB')
-    img = img.resize((224, 224))
-    img_array = tf.keras.preprocessing.image.img_to_array(img)
-    img_array = tf.expand_dims(img_array, 0)
-    img_array = img_array / 255.0
+    """Función principal de predicción"""
+    if image is None:
+        return None, None, "⚠️ **Por favor, sube una imagen primero.**"
     
-    # Hacer predicción
-    predictions = model.predict(img_array)
-    predicted_class = class_names[np.argmax(predictions[0])]
-    confidence = float(np.max(predictions[0]))
-    
-    return f"Enfermedad: {predicted_class}\nConfianza: {confidence:.2%}"
-
-# Cargar logo
-logo_path = "src/Logo_FitoScan.png"
-logo_img = None
-
-if os.path.exists(logo_path):
     try:
-        with open(logo_path, "rb") as f:
-            logo_data = f.read()
-            logo_img = base64.b64encode(logo_data).decode()
-    except Exception as e:
-        print(f"Error cargando logo: {e}")
-
-# Crear interfaz
-with gr.Blocks(title="FitoScan - Detector de Enfermedades en Plantas", 
-               theme=gr.themes.Soft(primary_hue="green")) as demo:
-    
-    gr.Markdown("# 🌱 FitoScan - Detector de Enfermedades en Plantas")
-    
-    with gr.Row():
-        with gr.Column(scale=1):
-            if logo_img:
-                # Versión corregida sin el parámetro 'shape'
-                gr.HTML(f'<img src="data:image/png;base64,{logo_img}" style="width: 150px; height: 150px; object-fit: contain;" alt="FitoScan Logo" />')
-            else:
-                gr.Markdown("### 🌿 FitoScan")
+        # Preprocesar imagen
+        img = Image.fromarray(image)
+        img = img.resize((128, 128))  # Cambié de 224 a 128 según tu error
+        img_array = np.array(img)
         
-        with gr.Column(scale=3):
-            gr.Markdown("""
-            ### ¡Bienvenido a FitoScan!
+        # Normalizar si es necesario
+        if img_array.max() > 1:
+            img_array = img_array / 255.0
             
-            Sube una imagen de una hoja de planta y nuestro modelo de inteligencia artificial 
-            identificará si tiene alguna enfermedad. Admite más de 35 tipos diferentes de 
-            enfermedades en plantas como tomate, manzana, uva, maíz y muchas más.
-            """)
-    
-    with gr.Row():
-        with gr.Column():
-            image_input = gr.Image(label="📸 Subir imagen de la planta")
-            predict_btn = gr.Button("🔍 Analizar Planta", variant="primary", size="lg")
+        img_array = np.expand_dims(img_array, axis=0)
         
-        with gr.Column():
-            result_output = gr.Textbox(label="🎯 Resultado del Análisis", 
-                                     placeholder="Los resultados aparecerán aquí...",
-                                     lines=3)
-    
-    predict_btn.click(fn=predict_disease, inputs=image_input, outputs=result_output)
-    
-    gr.Markdown("""
-    ---
-    ### 📋 Instrucciones de uso:
-    1. **Subir imagen**: Haz clic en el área de carga y selecciona una imagen clara de la hoja
-    2. **Analizar**: Presiona el botón "Analizar Planta" 
-    3. **Ver resultado**: El diagnóstico aparecerá con el nivel de confianza
-    
-    ### 🌱 Plantas compatibles:
-    Manzana, Arándano, Cereza, Maíz, Uva, Naranja, Durazno, Pimiento, Papa, Frambuesa, Soja, Calabaza, Fresa, Tomate
-    
-    **Nota**: Para mejores resultados, usa imágenes claras y bien iluminadas de las hojas.
-    """)
+        # Realizar predicción
+        predictions = model.predict(img_array)
+        predicted_class_idx = np.argmax(predictions[0])
+        confidence = float(predictions[0][predicted_class_idx]) * 100
+        
+        # Obtener información de la predicción
+        predicted_class = class_names[predicted_class_idx]
+        plant_type = get_plant_type(predicted_class)
+        disease_name = get_disease_name(predicted_class)
+        
+        # Crear gráficos
+        prob_chart = create_prediction_chart(predictions, class_names)
+        confidence_gauge = create_confidence_gauge(confidence)
+        
+        # Crear mensaje de resultado con mejor formato
+        if 'healthy' in predicted_class.lower():
+            result_message = f"""
+            <div style='background: linear-gradient(135deg, #E8F5E8 0%, #C8E6C9 100%); padding: 25px; border-radius: 15px; border-left: 5px solid #2E7D32; box-shadow: 0 4px 6px rgba(0,0,0,0.1);'>
+                <h2 style='color: #1B5E20; margin: 0 0 15px 0; font-family: Arial Black;'>
+                    🌱 <strong>{plant_type}</strong> - ✅ <strong>SALUDABLE</strong>
+                </h2>
+                <p style='color: #2E7D32; font-size: 18px; margin: 0; font-weight: bold;'>
+                    🎯 Confianza: {confidence:.1f}%
+                </p>
+                <p style='color: #388E3C; margin: 10px 0 0 0; font-style: italic;'>
+                    ¡Excelente! Tu planta se ve en perfecto estado de salud.
+                </p>
+            </div>
+            """
+        else:
+            result_message = f"""
+            <div style='background: linear-gradient(135deg, #FFF3E0 0%, #FFE0B2 100%); padding: 25px; border-radius: 15px; border-left: 5px solid #F57C00; box-shadow: 0 4px 6px rgba(0,0,0,0.1);'>
+                <h2 style='color: #E65100; margin: 0 0 15px 0; font-family: Arial Black;'>
+                    🍃 <strong>{plant_type}</strong>
+                </h2>
+                <h3 style='color: #FF6F00; margin: 0 0 15px 0;'>
+                    🔍 <strong>Enfermedad detectada:</strong> {disease_name} ⚠️
+                </h3>
+                <p style='color: #F57C00; font-size: 18px; margin: 0; font-weight: bold;'>
+                    🎯 Confianza: {confidence:.1f}%
+                </p>
+                <p style='color: #FF8F00; margin: 10px 0 0 0; font-style: italic;'>
+                    Se recomienda consultar con un especialista en fitopatología.
+                </p>
+            </div>
+            """
+        
+        return prob_chart, confidence_gauge, result_message
+        
+    except Exception as e:
+        error_msg = f"""
+        <div style='background: #FFEBEE; padding: 20px; border-radius: 10px; border-left: 5px solid #F44336;'>
+            <h3 style='color: #C62828; margin: 0;'>❌ Error en la predicción</h3>
+            <p style='color: #D32F2F; margin: 10px 0 0 0;'>{str(e)}</p>
+        </div>
+        """
+        return None, None, error_msg
 
+# Crear la interfaz de Gradio
+def create_interface():
+    with gr.Blocks(
+        theme=gr.themes.Soft(primary_hue="green", secondary_hue="blue"),
+        css="""
+        .gradio-container {
+            max-width: 100% !important;
+            background: white !important;
+            padding: 10px !important;
+        }
+        .main-header {
+            text-align: center;
+            margin-bottom: 2rem;
+            background: linear-gradient(135deg, #E8F5E8 0%, #C8E6C9 100%);
+            padding: 2rem;
+            border-radius: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .logo-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        .instructions-box {
+            background: linear-gradient(135deg, #F3E5F5 0%, #E1BEE7 100%);
+            padding: 1.5rem;
+            border-radius: 15px;
+            border-left: 5px solid #7B1FA2;
+            margin-top: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .plants-box {
+            background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%);
+            padding: 1.5rem;
+            border-radius: 15px;
+            border-left: 5px solid #1976D2;
+            margin-top: 2rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .upload-section {
+            background: #FAFAFA;
+            padding: 1.5rem;
+            border-radius: 15px;
+            border: 2px dashed #4CAF50;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .results-section {
+            background: #FAFAFA;
+            padding: 1.5rem;
+            border-radius: 15px;
+            border: 2px solid #2196F3;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        /* Responsividad */
+        @media (max-width: 768px) {
+            .gradio-container {
+                padding: 5px !important;
+            }
+            .main-header, .instructions-box, .plants-box, .upload-section, .results-section {
+                padding: 1rem !important;
+                margin: 1rem 0 !important;
+            }
+            .logo-container {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+            h1 {
+                font-size: 2rem !important;
+            }
+            h2 {
+                font-size: 1.2rem !important;
+            }
+            h3 {
+                font-size: 1rem !important;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .gradio-container {
+                padding: 2px !important;
+            }
+            .main-header, .instructions-box, .plants-box, .upload-section, .results-section {
+                padding: 0.8rem !important;
+                border-radius: 10px !important;
+            }
+            h1 {
+                font-size: 1.5rem !important;
+            }
+            h2 {
+                font-size: 1rem !important;
+            }
+        }
+        """,
+        title="🌱 FitoScan - Detector de Enfermedades en Plantas"
+    ) as app:
+        
+        # Header con logo usando base64
+        def get_logo_base64():
+            try:
+                with open("src/Logo_FitoScan.png", "rb") as img_file:
+                    return base64.b64encode(img_file.read()).decode()
+            except:
+                return None
+        
+        logo_b64 = get_logo_base64()
+        logo_img = f'<img src="data:image/png;base64,{logo_b64}" style="height: 60px; width: auto;">' if logo_b64 else '🌱'
+        
+        with gr.Row():
+            with gr.Column(scale=1):
+                if logo_b64:
+                    gr.HTML(f'<div style="text-align: center; padding: 1rem;"><img src="data:image/png;base64,{logo_b64}" style="height: 80px; width: auto;"></div>')
+                else:
+                    gr.HTML('<div style="text-align: center; padding: 1rem; font-size: 4rem;">🌱</div>')
+            with gr.Column(scale=4):
+                gr.HTML("""
+                <div style='text-align: center; padding: 1rem;'>
+                    <h1 style='color: #1B5E20; font-size: 3rem; margin: 0; font-family: Arial Black; text-shadow: 2px 2px 4px rgba(0,0,0,0.1);'>
+                        FitoScan
+                    </h1>
+                    <h2 style='color: #2E7D32; margin: 0.5rem 0; font-size: 1.5rem; font-weight: normal;'>
+                        Detector Inteligente de Enfermedades en Plantas 🔬
+                    </h2>
+                    <p style='color: #388E3C; font-size: 1.1rem; margin: 0.5rem 0;'>
+                        Tecnología de IA avanzada para el diagnóstico fitosanitario
+                    </p>
+                </div>
+                """)
+        
+        gr.HTML("""
+        <div style='background: linear-gradient(135deg, #E8F5E8 0%, #C8E6C9 100%); padding: 1rem; border-radius: 15px; margin: 1rem 0; box-shadow: 0 4px 6px rgba(0,0,0,0.1);'>
+        </div>
+        """)
+        
+        with gr.Row():
+            with gr.Column(scale=1, min_width=300):
+                gr.HTML("""
+                <div class="upload-section">
+                    <h3 style='color: #1B5E20; text-align: center; margin-bottom: 1rem; font-family: Arial Black;'>
+                        📸 Subir Imagen de la Planta
+                    </h3>
+                </div>
+                """)
+                
+                image_input = gr.Image(
+                    label="Arrastra aquí la imagen o haz clic para seleccionar",
+                    type="numpy",
+                    height=400
+                )
+                
+                predict_btn = gr.Button(
+                    "🔍 Analizar Planta", 
+                    variant="primary", 
+                    size="lg",
+                    elem_classes="analyze-button"
+                )
+                
+                gr.HTML("""
+                <div class="instructions-box">
+                    <h4 style='color: #4A148C; margin: 0 0 1rem 0; font-family: Arial Black;'>
+                        📋 Instrucciones de Uso:
+                    </h4>
+                    <ul style='color: #6A1B9A; margin: 0; line-height: 1.6;'>
+                        <li><strong>Calidad:</strong> Usa imágenes claras y bien iluminadas</li>
+                        <li><strong>Enfoque:</strong> La hoja debe ocupar la mayor parte de la imagen</li>
+                        <li><strong>Formato:</strong> JPG, PNG o WEBP</li>
+                        <li><strong>Resolución:</strong> Mínimo 128x128 píxeles</li>
+                    </ul>
+                </div>
+                """)
+                
+            with gr.Column(scale=2, min_width=400):
+                # Crear logo para el título usando base64
+                title_logo = f'<img src="data:image/png;base64,{logo_b64}" style="height: 20px; width: auto; margin-right: 8px;">' if logo_b64 else '📊'
+                
+                gr.HTML(f"""
+                <div class="results-section">
+                    <h3 style='color: #1976D2; text-align: center; margin-bottom: 1rem; font-family: Arial Black; display: flex; align-items: center; justify-content: center; gap: 0.5rem;'>
+                        {title_logo} Resultados del Análisis
+                    </h3>
+                </div>
+                """)
+                
+                result_html = gr.HTML("""
+                <div style='text-align: center; color: #666; padding: 2rem;'>
+                    <h4>🕒 Esperando imagen para analizar...</h4>
+                    <p>Sube una imagen de una hoja para comenzar el diagnóstico</p>
+                </div>
+                """)
+                
+                with gr.Row():
+                    confidence_plot = gr.Plot(label="Medidor de Confianza")
+                    probability_plot = gr.Plot(label="Distribución de Probabilidades")
+        
+        gr.HTML("""
+        <div class="plants-box">
+            <h4 style='color: #0D47A1; margin: 0 0 1rem 0; font-family: Arial Black;'>
+                🌿 Plantas y Enfermedades Detectables:
+            </h4>
+            <div style='display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; color: #1565C0;'>
+                <div><strong>🍎 Manzana:</strong> Sarna, Podredumbre negra, Roya</div>
+                <div><strong>🫐 Arándano:</strong> Estado saludable</div>
+                <div><strong>🍒 Cereza:</strong> Oídio, Estado saludable</div>
+                <div><strong>🌽 Maíz:</strong> Manchas foliares, Roya, Tizón</div>
+                <div><strong>🍇 Uva:</strong> Podredumbre negra, Esca, Tizón foliar</div>
+                <div><strong>🍊 Naranja:</strong> Huanglongbing (HLB)</div>
+                <div><strong>🍑 Durazno:</strong> Mancha bacteriana</div>
+                <div><strong>🌶️ Pimiento:</strong> Mancha bacteriana</div>
+                <div><strong>🥔 Papa:</strong> Tizón temprano y tardío</div>
+                <div><strong>🍓 Fresa:</strong> Quemadura foliar</div>
+                <div><strong>🍅 Tomate:</strong> Múltiples enfermedades</div>
+                <div><strong>🫛 Soja:</strong> Estado saludable</div>
+            </div>
+        </div>
+        """)
+        
+        # Conectar eventos
+        predict_btn.click(
+            fn=predict_disease,
+            inputs=[image_input],
+            outputs=[probability_plot, confidence_plot, result_html]
+        )
+        
+        image_input.change(
+            fn=predict_disease,
+            inputs=[image_input],
+            outputs=[probability_plot, confidence_plot, result_html]
+        )
+    
+    return app
+
+# Ejecutar la aplicación
 if __name__ == "__main__":
-    demo.launch(share=True, server_name="0.0.0.0", server_port=7860)
+    app = create_interface()
+    app.launch(
+        server_name="127.0.0.1",
+        server_port=8080,
+        share=True,
+        inbrowser=True,
+        show_error=True
+    )
