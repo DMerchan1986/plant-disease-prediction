@@ -1,0 +1,15 @@
+# Entorno virtual
+venv/
+
+# Archivos temporales de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Configuración de IDE
+.vscode/
+.i
+# data set (muy pesado)
+/data/
+/output/
