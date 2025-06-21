@@ -33,12 +33,7 @@ pip install -r requirements.txt
 ```
 
 
-Ejemplo de salida:
 
-```
-
-P
-```
 
 ## 📁 Estructura del proyecto
 
@@ -59,10 +54,9 @@ plant-disease-prediction/
 │   └── app.py            # Script de interfaz web
 
 
-├── data/                 # Dataset de imágenes (opcional)
+├── data/                 # Dataset de imágenes 
 
 
-├── download_model.ps1    # Script de descarga del modelo
 
 ├── requirements.txt      # Dependencias de Python
 
@@ -104,25 +98,12 @@ Este proyecto está bajo la [Licencia MIT](LICENSE) - ver el archivo [LICENSE](L
 
 ## ✉️ Contacto
 
-Daniel Merchan - [@DMerchan1986](https://github.com/DMerchan1986)
+[@DMerchan1986](https://github.com/DMerchan1986)
 
 Proyecto: [https://github.com/DMerchan1986/plant-disease-prediction](https://github.com/DMerchan1986/plant-disease-prediction)
 
-```
 
-### Pasos para usar este archivo:
 
-1. Abre tu editor de texto (como Notepad, VSCode, etc.).
-
-2. Copia todo el contenido de arriba.
-
-3. Pégalo en un nuevo archivo.
-
-4. Guarda el archivo como `README.md` en la carpeta principal de tu proyecto (por ejemplo, `C:\Users\DELL\Desktop\plant-disease-prediction\README.md`).
-
-5. **No olvides reemplazar** `TU_ID_DE_ARCHIVO` con el ID real de tu archivo en Google Drive.
-
-### Para agregar el archivo a tu repositorio:
 
 Abre PowerShell en la carpeta de tu proyecto y ejecuta:
 
