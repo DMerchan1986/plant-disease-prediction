@@ -28,7 +28,7 @@ https://drive.google.com/drive/folders/1tabjM32iX-SEc3Ofpc_AJIjW7RSdTfhX?usp=sha
 
 # 3. Instalar dependencias de Python
 
-pip install -r requirements.txt
+.\venv\Scripts\Activate.ps1
 
 ```
 
