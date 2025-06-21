@@ -14,4 +14,4 @@ __pycache__/
 /data/
 
 # modelos entrenados (muy pesado)
-*.keras
+output/plots/model.keras 
