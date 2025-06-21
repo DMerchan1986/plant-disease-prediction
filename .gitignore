@@ -12,4 +12,3 @@ __pycache__/
 .i
 # data set (muy pesado)
 /data/
-/output/
