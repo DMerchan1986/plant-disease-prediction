@@ -7,6 +7,7 @@ import plotly.express as px
 from plotly.subplots import make_subplots
 import base64
 import io
+import os
 
 # Cargar el modelo (ruta corregida)
 model = tf.keras.models.load_model('output/model.keras')
@@ -169,13 +170,13 @@ def predict_disease(image):
     try:
         # Preprocesar imagen
         img = Image.fromarray(image)
-        img = img.resize((128, 128))  # Cambié de 224 a 128 según tu error
+        img = img.resize((128, 128))  # Cambié de 224 a 128
         img_array = np.array(img)
         
         # Normalizar si es necesario
         if img_array.max() > 1:
             img_array = img_array / 255.0
-            
+        
         img_array = np.expand_dims(img_array, axis=0)
         
         # Realizar predicción
@@ -196,162 +197,96 @@ def predict_disease(image):
         if 'healthy' in predicted_class.lower():
             result_message = f"""
             <div style='background: linear-gradient(135deg, #E8F5E8 0%, #C8E6C9 100%); padding: 25px; border-radius: 15px; border-left: 5px solid #2E7D32; box-shadow: 0 4px 6px rgba(0,0,0,0.1);'>
-                <h2 style='color: #1B5E20; margin: 0 0 15px 0; font-family: Arial Black;'>
-                    🌱 <strong>{plant_type}</strong> - ✅ <strong>SALUDABLE</strong>
-                </h2>
-                <p style='color: #2E7D32; font-size: 18px; margin: 0; font-weight: bold;'>
-                    🎯 Confianza: {confidence:.1f}%
-                </p>
-                <p style='color: #388E3C; margin: 10px 0 0 0; font-style: italic;'>
-                    ¡Excelente! Tu planta se ve en perfecto estado de salud.
-                </p>
+            <h2 style='color: #1B5E20; margin: 0 0 15px 0; font-family: Arial Black;'>
+            🌱 <strong>{plant_type}</strong> - ✅ <strong>SALUDABLE</strong>
+            </h2>
+            <p style='color: #2E7D32; font-size: 18px; margin: 0; font-weight: bold;'>
+            🎯 Confianza: {confidence:.1f}%
+            </p>
+            <p style='color: #388E3C; margin: 10px 0 0 0; font-style: italic;'>
+            ¡Excelente! Tu planta se ve en perfecto estado de salud.
+            </p>
             </div>
             """
         else:
             result_message = f"""
             <div style='background: linear-gradient(135deg, #FFF3E0 0%, #FFE0B2 100%); padding: 25px; border-radius: 15px; border-left: 5px solid #F57C00; box-shadow: 0 4px 6px rgba(0,0,0,0.1);'>
-                <h2 style='color: #E65100; margin: 0 0 15px 0; font-family: Arial Black;'>
-                    🍃 <strong>{plant_type}</strong>
-                </h2>
-                <h3 style='color: #FF6F00; margin: 0 0 15px 0;'>
-                    🔍 <strong>Enfermedad detectada:</strong> {disease_name} ⚠️
-                </h3>
-                <p style='color: #F57C00; font-size: 18px; margin: 0; font-weight: bold;'>
-                    🎯 Confianza: {confidence:.1f}%
-                </p>
-                <p style='color: #FF8F00; margin: 10px 0 0 0; font-style: italic;'>
-                    Se recomienda consultar con un especialista en fitopatología.
-                </p>
+            <h2 style='color: #E65100; margin: 0 0 15px 0; font-family: Arial Black;'>
+            🍃 <strong>{plant_type}</strong>
+            </h2>
+            <h3 style='color: #FF6F00; margin: 0 0 15px 0;'>
+            🔍 <strong>Enfermedad detectada:</strong> {disease_name} ⚠️
+            </h3>
+            <p style='color: #F57C00; font-size: 18px; margin: 0; font-weight: bold;'>
+            🎯 Confianza: {confidence:.1f}%
+            </p>
+            <p style='color: #FF8F00; margin: 10px 0 0 0; font-style: italic;'>
+            Se recomienda consultar con un especialista en fitopatología.
+            </p>
             </div>
             """
         
         return prob_chart, confidence_gauge, result_message
-        
+    
     except Exception as e:
         error_msg = f"""
         <div style='background: #FFEBEE; padding: 20px; border-radius: 10px; border-left: 5px solid #F44336;'>
-            <h3 style='color: #C62828; margin: 0;'>❌ Error en la predicción</h3>
-            <p style='color: #D32F2F; margin: 10px 0 0 0;'>{str(e)}</p>
+        <h3 style='color: #C62828; margin: 0;'>❌ Error en la predicción</h3>
+        <p style='color: #D32F2F; margin: 10px 0 0 0;'>{str(e)}</p>
         </div>
         """
         return None, None, error_msg
 
 # Crear la interfaz de Gradio
 def create_interface():
+    custom_css = '''
+    img.logo {
+        max-height: 200px;
+        max-width: 100%;
+        height: auto;
+        width: auto;
+        margin: 0 auto;
+        display: block;
+    }
+
+    @media (max-width: 600px) {
+        img.logo {
+            max-height: 200px;
+        }
+    }
+    '''
+
     with gr.Blocks(
         theme=gr.themes.Soft(primary_hue="green", secondary_hue="blue"),
-        css="""
-        .gradio-container {
-            max-width: 100% !important;
-            background: white !important;
-            padding: 10px !important;
-        }
-        .main-header {
-            text-align: center;
-            margin-bottom: 2rem;
-            background: linear-gradient(135deg, #E8F5E8 0%, #C8E6C9 100%);
-            padding: 2rem;
-            border-radius: 20px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        .logo-container {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 1rem;
-            margin-bottom: 1rem;
-        }
-        .instructions-box {
-            background: linear-gradient(135deg, #F3E5F5 0%, #E1BEE7 100%);
-            padding: 1.5rem;
-            border-radius: 15px;
-            border-left: 5px solid #7B1FA2;
-            margin-top: 1rem;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .plants-box {
-            background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%);
-            padding: 1.5rem;
-            border-radius: 15px;
-            border-left: 5px solid #1976D2;
-            margin-top: 2rem;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .upload-section {
-            background: #FAFAFA;
-            padding: 1.5rem;
-            border-radius: 15px;
-            border: 2px dashed #4CAF50;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
-        .results-section {
-            background: #FAFAFA;
-            padding: 1.5rem;
-            border-radius: 15px;
-            border: 2px solid #2196F3;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
-        
-        /* Responsividad */
-        @media (max-width: 768px) {
-            .gradio-container {
-                padding: 5px !important;
-            }
-            .main-header, .instructions-box, .plants-box, .upload-section, .results-section {
-                padding: 1rem !important;
-                margin: 1rem 0 !important;
-            }
-            .logo-container {
-                flex-direction: column;
-                gap: 0.5rem;
-            }
-            h1 {
-                font-size: 2rem !important;
-            }
-            h2 {
-                font-size: 1.2rem !important;
-            }
-            h3 {
-                font-size: 1rem !important;
-            }
-        }
-        
-        @media (max-width: 480px) {
-            .gradio-container {
-                padding: 2px !important;
-            }
-            .main-header, .instructions-box, .plants-box, .upload-section, .results-section {
-                padding: 0.8rem !important;
-                border-radius: 10px !important;
-            }
-            h1 {
-                font-size: 1.5rem !important;
-            }
-            h2 {
-                font-size: 1rem !important;
-            }
-        }
-        """,
+        css=custom_css,
         title="🌱 FitoScan - Detector de Enfermedades en Plantas"
     ) as app:
-        
-        # Header con logo usando base64
+
         def get_logo_base64():
-            try:
-                with open("src/Logo_FitoScan.png", "rb") as img_file:
-                    return base64.b64encode(img_file.read()).decode()
-            except:
-                return None
-        
+            possible_paths = [
+                "src/Logo_FitoScan.png",
+                "Logo_FitoScan.png",
+                "assets/Logo_FitoScan.png",
+                "images/Logo_FitoScan.png"
+            ]
+            for path in possible_paths:
+                if os.path.exists(path):
+                    with open(path, "rb") as img_file:
+                        return base64.b64encode(img_file.read()).decode()
+            return None
+
         logo_b64 = get_logo_base64()
-        logo_img = f'<img src="data:image/png;base64,{logo_b64}" style="height: 60px; width: auto;">' if logo_b64 else '🌱'
-        
+
         with gr.Row():
             with gr.Column(scale=1):
                 if logo_b64:
-                    gr.HTML(f'<div style="text-align: center; padding: 1rem;"><img src="data:image/png;base64,{logo_b64}" style="height: 80px; width: auto;"></div>')
+                    gr.HTML(f'''
+                    <div style="text-align: center; margin: 0; padding: 0;">
+                        <img class="logo" src="data:image/png;base64,{logo_b64}" alt="Logo FitoScan">
+                    </div>
+                    ''')
                 else:
-                    gr.HTML('<div style="text-align: center; padding: 1rem; font-size: 4rem;">🌱</div>')
+                    gr.HTML('<div style="text-align: center; font-size: 6rem; margin: 0; padding: 0;">🌱</div>')
             with gr.Column(scale=4):
                 gr.HTML("""
                 <div style='text-align: center; padding: 1rem;'>
@@ -366,72 +301,55 @@ def create_interface():
                     </p>
                 </div>
                 """)
-        
+
+        image_input = gr.Image(
+            label="Arrastra aquí la imagen o haz clic para seleccionar",
+            type="numpy",
+            height=400
+        )
+
+        predict_btn = gr.Button(
+            "🔍 Analizar Planta", 
+            variant="primary", 
+            size="lg",
+            elem_classes="analyze-button"
+        )
+
         gr.HTML("""
-        <div style='background: linear-gradient(135deg, #E8F5E8 0%, #C8E6C9 100%); padding: 1rem; border-radius: 15px; margin: 1rem 0; box-shadow: 0 4px 6px rgba(0,0,0,0.1);'>
+        <div class="instructions-box">
+            <h4 style='color: #4A148C; margin: 0 0 1rem 0; font-family: Arial Black;'>
+                📋 Instrucciones de Uso:
+            </h4>
+            <ul style='color: #6A1B9A; margin: 0; line-height: 1.6;'>
+                <li><strong>Calidad:</strong> Usa imágenes claras y bien iluminadas</li>
+                <li><strong>Enfoque:</strong> La hoja debe ocupar la mayor parte de la imagen</li>
+                <li><strong>Formato:</strong> JPG, PNG o WEBP</li>
+                <li><strong>Resolución:</strong> Mínimo 128x128 píxeles</li>
+            </ul>
         </div>
         """)
-        
+
+        with gr.Column(scale=2, min_width=400):
+            title_logo = f'<img src="data:image/png;base64,{logo_b64}" style="height: 20px; width: auto; margin-right: 8px;">' if logo_b64 else '📊'
+            gr.HTML(f"""
+            <div class="results-section">
+                <h3 style='color: #1976D2; text-align: center; margin-bottom: 1rem; font-family: Arial Black; display: flex; align-items: center; justify-content: center; gap: 0.5rem;'>
+                    {title_logo} Resultados del Análisis
+                </h3>
+            </div>
+            """)
+
+        result_html = gr.HTML("""
+        <div style='text-align: center; color: #666; padding: 2rem;'>
+            <h4>🕒 Esperando imagen para analizar...</h4>
+            <p>Sube una imagen de una hoja para comenzar el diagnóstico</p>
+        </div>
+        """)
+
         with gr.Row():
-            with gr.Column(scale=1, min_width=300):
-                gr.HTML("""
-                <div class="upload-section">
-                    <h3 style='color: #1B5E20; text-align: center; margin-bottom: 1rem; font-family: Arial Black;'>
-                        📸 Subir Imagen de la Planta
-                    </h3>
-                </div>
-                """)
-                
-                image_input = gr.Image(
-                    label="Arrastra aquí la imagen o haz clic para seleccionar",
-                    type="numpy",
-                    height=400
-                )
-                
-                predict_btn = gr.Button(
-                    "🔍 Analizar Planta", 
-                    variant="primary", 
-                    size="lg",
-                    elem_classes="analyze-button"
-                )
-                
-                gr.HTML("""
-                <div class="instructions-box">
-                    <h4 style='color: #4A148C; margin: 0 0 1rem 0; font-family: Arial Black;'>
-                        📋 Instrucciones de Uso:
-                    </h4>
-                    <ul style='color: #6A1B9A; margin: 0; line-height: 1.6;'>
-                        <li><strong>Calidad:</strong> Usa imágenes claras y bien iluminadas</li>
-                        <li><strong>Enfoque:</strong> La hoja debe ocupar la mayor parte de la imagen</li>
-                        <li><strong>Formato:</strong> JPG, PNG o WEBP</li>
-                        <li><strong>Resolución:</strong> Mínimo 128x128 píxeles</li>
-                    </ul>
-                </div>
-                """)
-                
-            with gr.Column(scale=2, min_width=400):
-                # Crear logo para el título usando base64
-                title_logo = f'<img src="data:image/png;base64,{logo_b64}" style="height: 20px; width: auto; margin-right: 8px;">' if logo_b64 else '📊'
-                
-                gr.HTML(f"""
-                <div class="results-section">
-                    <h3 style='color: #1976D2; text-align: center; margin-bottom: 1rem; font-family: Arial Black; display: flex; align-items: center; justify-content: center; gap: 0.5rem;'>
-                        {title_logo} Resultados del Análisis
-                    </h3>
-                </div>
-                """)
-                
-                result_html = gr.HTML("""
-                <div style='text-align: center; color: #666; padding: 2rem;'>
-                    <h4>🕒 Esperando imagen para analizar...</h4>
-                    <p>Sube una imagen de una hoja para comenzar el diagnóstico</p>
-                </div>
-                """)
-                
-                with gr.Row():
-                    confidence_plot = gr.Plot(label="Medidor de Confianza")
-                    probability_plot = gr.Plot(label="Distribución de Probabilidades")
-        
+            confidence_plot = gr.Plot(label="Medidor de Confianza")
+            probability_plot = gr.Plot(label="Distribución de Probabilidades")
+
         gr.HTML("""
         <div class="plants-box">
             <h4 style='color: #0D47A1; margin: 0 0 1rem 0; font-family: Arial Black;'>
@@ -453,20 +371,20 @@ def create_interface():
             </div>
         </div>
         """)
-        
+
         # Conectar eventos
         predict_btn.click(
             fn=predict_disease,
             inputs=[image_input],
             outputs=[probability_plot, confidence_plot, result_html]
         )
-        
+
         image_input.change(
             fn=predict_disease,
             inputs=[image_input],
             outputs=[probability_plot, confidence_plot, result_html]
         )
-    
+
     return app
 
 # Ejecutar la aplicación
