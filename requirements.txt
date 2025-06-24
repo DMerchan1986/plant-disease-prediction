@@ -1,0 +1,16 @@
+tensorflow==2.15.0
+matplotlib==3.7.1
+scikit-learn==1.2.2
+numpy==1.23.5
+pandas==2.0.3
+opencv-python==4.7.0.72
+seaborn==0.12.2
+gradio==5.34.2
+pillow>=9.0.0
+requests>=2.25.0
+plotly>=6.1.2
+
+# Opcional: Para funcionalidad ML futura
+# torch>=2.0.0
+# torchvision>=0.15.0
+# transformers>=4.20.0
